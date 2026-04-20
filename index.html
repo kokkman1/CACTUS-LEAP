@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Hyena Jump Game</title>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #1a1a1a; font-family: 'Malgun Gothic', sans-serif; overflow: hidden; }
+        #game-container { position: relative; width: 1000px; height: 400px; box-shadow: 0 0 30px rgba(0,0,0,0.7); }
+        canvas { background: #fff; display: block; image-rendering: pixelated; width: 100%; height: 100%; }
+        
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background-size: cover; background-position: center; z-index: 10;
+        }
+        
+        /* 시작 화면 배경 이미지 */
+        #start-screen { background-image: url('assets/images/start_bg.png'); }
+        
+        .hidden { display: none !important; }
+        input { padding: 12px; font-size: 16px; margin-bottom: 15px; border-radius: 5px; border: 2px solid #e67e22; text-align: center; width: 220px; }
+        button { padding: 12px 30px; font-size: 20px; cursor: pointer; border-radius: 5px; border: none; background: #e67e22; color: white; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 0 #d35400; }
+        button:hover { background: #d35400; transform: translateY(-2px); }
+        button:active { transform: translateY(2px); box-shadow: none; }
+        
+        /* UI 레이어 */
+        #ui-layer { position: absolute; top: 20px; left: 25px; color: #fff; font-size: 20px; font-weight: bold; text-shadow: 2px 2px 4px #000; pointer-events: none; z-index: 5; }
+        
+        /* 점수 강조 효과 */
+        #ui-score { display: inline-block; transition: transform 0.2s ease-out; }
+        .score-bump { transform: scale(1.5); color: #f1c40f !important; text-shadow: 0 0 10px #f39c12; }
+        
+        #gameover-screen { background: rgba(0, 0, 0, 0.8); color: white; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-layer">PLAYER: <span id="ui-name">-</span> | SCORE: <span id="ui-score">0</span></div>
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="start-screen" class="overlay">
+            <input type="text" id="player-name" placeholder="닉네임을 입력하세요" maxlength="8">
+            <button onclick="startGame()">START GAME</button>
+        </div>
+
+        <div id="gameover-screen" class="overlay hidden">
+            <h2 style="color: #e74c3c; font-size: 45px; margin-bottom: 10px;">GAME OVER</h2>
+            <p id="final-score" style="font-size: 26px; margin-bottom: 25px;">Score: 0</p>
+            <div style="display:flex; gap: 20px;">
+                <button onclick="resetGame()" style="background: #27ae60; box-shadow: 0 4px 0 #1e8449;">RETRY</button>
+                <button onclick="showRanking()" style="background: #2980b9; box-shadow: 0 4px 0 #1f6391;">RANKING</button>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
