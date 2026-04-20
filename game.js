@@ -5,7 +5,7 @@ canvas.width = 1000;
 canvas.height = 400;
 ctx.imageSmoothingEnabled = false;
 
-// --- 에셋 로드 ---
+// --- 1. 에셋 로드 ---
 const assets = {
     sky: new Image(), mid: new Image(), ground: new Image(),
     character1: new Image(), character2: new Image(),
@@ -30,7 +30,10 @@ assets.itemMeat.src = 'assets/images/item_meat.png';
 assets.bgmMain.loop = true;
 assets.bgmMain.volume = 0.4;
 
-// --- 변수 설정 ---
+// --- 2. [보완] 기기별 속도 제어 변수 ---
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const speedAdjustment = isMobile ? 0.7 : 1.0; // 모바일은 70% 속도로 보정
+
 let gameState = 'START';
 let score = 0;
 let timer = 0;
@@ -41,7 +44,10 @@ let animationFrame;
 let playerName = "";
 
 let skyX = 0, midX = 0, groundX = 0;
-const GAME_SPEED = 6;
+
+// 모바일 보정값이 적용된 게임 속도
+const GAME_SPEED = 6 * speedAdjustment; 
+
 let isBoosterActive = false;
 let boosterTimer = 0;
 let boostMultiplier = 1.0;
@@ -53,7 +59,7 @@ let obstacleTimer = 0;
 let itemMeatTimerMax = 600;
 let itemMeatTimer = 0;
 
-// --- 플레이어 ---
+// --- 3. 플레이어 ---
 const player = {
     x: 100, y: 265, width: 100, height: 70,
     dy: 0, jumpForce: 15, gravity: 0.7, isJumping: false, frame: 0,
@@ -78,7 +84,7 @@ const player = {
     }
 };
 
-// --- 장애물/아이템 클래스 ---
+// --- 4. 클래스 (장애물 및 아이템) ---
 class Obstacle {
     constructor(offsetX = 0) {
         this.width = 60; this.height = 70;
@@ -86,7 +92,10 @@ class Obstacle {
         this.img = Math.random() > 0.5 ? assets.obs : assets.obs2;
     }
     draw() { if (this.img.complete) ctx.drawImage(this.img, this.x, this.y, this.width, this.height); }
-    update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
+    update() { 
+        // 전체 속도에 보정값 적용
+        this.x -= (GAME_SPEED + score / 500) * boostMultiplier; 
+    }
 }
 
 class ItemMeat {
@@ -95,13 +104,19 @@ class ItemMeat {
     update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
 }
 
-// --- 배경/효과 ---
+// --- 5. 배경 및 효과 ---
 function initSpeedLines() {
     speedLines = [];
     for (let i = 0; i < 15; i++) {
-        speedLines.push({ x: Math.random() * canvas.width, y: Math.random() * (canvas.height - 100), length: 400 + Math.random() * 600, speed: 20 + Math.random() * 30 });
+        speedLines.push({ 
+            x: Math.random() * canvas.width, 
+            y: Math.random() * (canvas.height - 100), 
+            length: 400 + Math.random() * 600, 
+            speed: (20 + Math.random() * 30) * speedAdjustment // 효과 속도도 보정
+        });
     }
 }
+
 function drawSpeedLines() {
     if (!isBoosterActive) return;
     const alpha = (boostMultiplier - 1.0) / (MAX_BOOSTER_MULTIPLIER - 1.0) * 0.4;
@@ -109,35 +124,51 @@ function drawSpeedLines() {
     speedLines.forEach(line => {
         ctx.beginPath(); ctx.moveTo(line.x, line.y); ctx.lineTo(line.x + line.length, line.y); ctx.stroke();
         line.x -= line.speed * boostMultiplier;
-        if (line.x + line.length < 0) { line.x = canvas.width + Math.random() * 200; line.y = Math.random() * (canvas.height - 100); }
+        if (line.x + line.length < 0) { 
+            line.x = canvas.width + Math.random() * 200; 
+            line.y = Math.random() * (canvas.height - 100); 
+        }
     });
 }
+
 function drawBackground() {
     const curSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
-    skyX -= 0.5; midX -= 1.8; groundX -= curSpeed;
-    if (skyX <= -canvas.width) skyX = 0; if (midX <= -canvas.width) midX = 0; if (groundX <= -canvas.width) groundX = 0;
+    
+    // 배경 흐름 속도에 보정값 적용
+    skyX -= 0.5 * speedAdjustment; 
+    midX -= 1.8 * speedAdjustment; 
+    groundX -= curSpeed;
+
+    if (skyX <= -canvas.width) skyX = 0; 
+    if (midX <= -canvas.width) midX = 0; 
+    if (groundX <= -canvas.width) groundX = 0;
+
     ctx.drawImage(assets.sky, Math.floor(skyX), 0, canvas.width + 1, canvas.height);
     ctx.drawImage(assets.sky, Math.floor(skyX + canvas.width), 0, canvas.width + 1, canvas.height);
     ctx.drawImage(assets.mid, Math.floor(midX), 100, canvas.width + 1, 230);
     ctx.drawImage(assets.mid, Math.floor(midX + canvas.width), 100, canvas.width + 1, 230);
+    
     drawSpeedLines();
+
     ctx.drawImage(assets.ground, Math.floor(groundX), 310, canvas.width + 1, 90);
     ctx.drawImage(assets.ground, Math.floor(groundX + canvas.width), 310, canvas.width + 1, 90);
 }
 
-// --- 게임 루프 ---
+// --- 6. 게임 루프 및 시스템 ---
 function frame() {
     if (gameState !== 'PLAYING') return;
     animationFrame = requestAnimationFrame(frame);
     timer++; ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
 
+    // 점수 증가 속도 조절
     if (timer % 10 === 0) {
         const pointWeight = 1.0 + (boostMultiplier - 1.0) * (5 - 1) / (MAX_BOOSTER_MULTIPLIER - 1.0);
         score += Math.round(pointWeight);
     }
     document.getElementById('ui-score').innerText = score;
 
+    // 부스터 로직
     if (isBoosterActive) {
         boosterTimer--;
         if (boosterTimer > BOOSTER_DURATION * 0.8) boostMultiplier += 0.04;
@@ -147,26 +178,54 @@ function frame() {
         if (boosterTimer <= 0) isBoosterActive = false;
     } else { boostMultiplier = 1.0; }
 
-    obstacleTimer++;
+    // 장애물 생성 (모바일 보정에 따라 간격 조절 가능)
+    obstacleTimer += 1 * speedAdjustment; 
     if (obstacleTimer >= obstacleTimerMax) {
         obstacles.push(new Obstacle());
         if (Math.random() < 0.2) obstacles.push(new Obstacle(70));
-        obstacleTimerMax = 50 + Math.random() * 80; obstacleTimer = 0;
+        obstacleTimerMax = 50 + Math.random() * 80; 
+        obstacleTimer = 0;
     }
 
+    // 아이템 생성
     itemMeatTimer++;
     if (itemMeatTimer >= itemMeatTimerMax) {
-        let safe = true; obstacles.forEach(o => { if (Math.abs(canvas.width - o.x) < 150) safe = false; });
-        if (safe) { items.push(new ItemMeat()); itemMeatTimerMax = 600 + Math.random() * 600; itemMeatTimer = 0; }
+        let safe = true; 
+        obstacles.forEach(o => { if (Math.abs(canvas.width - o.x) < 150) safe = false; });
+        if (safe) { 
+            items.push(new ItemMeat()); 
+            itemMeatTimerMax = 600 + Math.random() * 600; 
+            itemMeatTimer = 0; 
+        }
     }
 
-    obstacles.forEach((o, i) => { o.update(); o.draw(); if (checkCollision(player, o)) endGame(); if (o.x + o.width < 0) obstacles.splice(i, 1); });
-    items.forEach((m, i) => { m.update(); m.draw(); if (checkCollision(player, m)) { items.splice(i, 1); isBoosterActive = true; boosterTimer = BOOSTER_DURATION; initSpeedLines(); playSfx(assets.point); } if (m.x + m.width < 0) items.splice(i, 1); });
+    // 충돌 체크 및 업데이트
+    obstacles.forEach((o, i) => { 
+        o.update(); o.draw(); 
+        if (checkCollision(player, o)) endGame(); 
+        if (o.x + o.width < 0) obstacles.splice(i, 1); 
+    });
+
+    items.forEach((m, i) => { 
+        m.update(); m.draw(); 
+        if (checkCollision(player, m)) { 
+            items.splice(i, 1); 
+            isBoosterActive = true; 
+            boosterTimer = BOOSTER_DURATION; 
+            initSpeedLines(); 
+            playSfx(assets.point); 
+        } 
+        if (m.x + m.width < 0) items.splice(i, 1); 
+    });
 
     player.update(); player.draw();
 }
 
-function checkCollision(p, o) { return !(p.x + 25 > o.x + o.width - 25 || p.x + p.width - 25 < o.x + 25 || p.y + 20 > o.y + o.height - 10 || p.y + p.height - 10 < o.y + 20); }
+function checkCollision(p, o) { 
+    return !(p.x + 25 > o.x + o.width - 25 || p.x + p.width - 25 < o.x + 25 || 
+             p.y + 20 > o.y + o.height - 10 || p.y + p.height - 10 < o.y + 20); 
+}
+
 function playSfx(audio) { audio.currentTime = 0; audio.play().catch(() => {}); }
 
 function startGame() {
@@ -185,8 +244,10 @@ function endGame() {
     playSfx(assets.die); setTimeout(() => playSfx(assets.gameover), 600);
     document.getElementById('gameover-screen').classList.remove('hidden');
     document.getElementById('final-score').innerText = `Score: ${score}`;
+    
     let ranks = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
-    ranks.push({ name: playerName, score: score }); ranks.sort((a, b) => b.score - a.score);
+    ranks.push({ name: playerName, score: score }); 
+    ranks.sort((a, b) => b.score - a.score);
     localStorage.setItem('hyenaRank', JSON.stringify(ranks.slice(0, 5)));
 }
 
@@ -204,6 +265,16 @@ function showRanking() {
     alert("🏆 TOP 5 랭킹 🏆\n\n" + msg);
 }
 
-// 이벤트 리스너
-window.addEventListener('keydown', (e) => { if ((e.code === 'Space' || e.code === 'ArrowUp') && !player.isJumping && gameState === 'PLAYING') { player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); } });
-window.addEventListener('touchstart', (e) => { if (gameState === 'PLAYING' && !player.isJumping) { player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); if (e.cancelable) e.preventDefault(); } }, { passive: false });
+// 이벤트 리스너 (키보드 및 터치)
+window.addEventListener('keydown', (e) => { 
+    if ((e.code === 'Space' || e.code === 'ArrowUp') && !player.isJumping && gameState === 'PLAYING') { 
+        player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); 
+    } 
+});
+
+window.addEventListener('touchstart', (e) => { 
+    if (gameState === 'PLAYING' && !player.isJumping) { 
+        player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); 
+        if (e.cancelable) e.preventDefault(); 
+    } 
+}, { passive: false });
