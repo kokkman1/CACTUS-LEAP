@@ -13,7 +13,7 @@
         </div>
 
         <div id="start-screen">
-            <div id="ui-group">
+            <div id="mobile-ui-wrapper">
                 <input type="text" id="player-name" placeholder="닉네임을 입력하세요" maxlength="8">
                 <button onclick="startGame()" class="btn-start">START GAME</button>
                 <button onclick="showRanking()" class="btn-rank">RANKING</button>
@@ -23,8 +23,10 @@
         <div id="gameover-screen" class="hidden">
             <h1>GAME OVER</h1>
             <p id="final-score">Score: 0</p>
-            <button onclick="resetGame()">RETRY</button>
-            <button onclick="showRanking()">RANKING</button>
+            <div id="gameover-buttons">
+                <button onclick="resetGame()">RETRY</button>
+                <button onclick="showRanking()">RANKING</button>
+            </div>
         </div>
 
         <canvas id="gameCanvas"></canvas>

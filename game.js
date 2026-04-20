@@ -5,16 +5,11 @@ canvas.width = 1000;
 canvas.height = 400;
 ctx.imageSmoothingEnabled = false;
 
-// --- 1. 에셋 로드 ---
+// --- 에셋 로드 ---
 const assets = {
-    sky: new Image(),
-    mid: new Image(),
-    ground: new Image(),
-    character1: new Image(),
-    character2: new Image(),
-    obs: new Image(),
-    obs2: new Image(),
-    itemMeat: new Image(),
+    sky: new Image(), mid: new Image(), ground: new Image(),
+    character1: new Image(), character2: new Image(),
+    obs: new Image(), obs2: new Image(), itemMeat: new Image(),
     bgmMain: new Audio('assets/sounds/bgm_main.mp3'),
     jump: new Audio('assets/sounds/sfx_jump.mp3'),
     die: new Audio('assets/sounds/sfx_die.mp3'),
@@ -35,7 +30,7 @@ assets.itemMeat.src = 'assets/images/item_meat.png';
 assets.bgmMain.loop = true;
 assets.bgmMain.volume = 0.4;
 
-// --- 2. 게임 변수 ---
+// --- 변수 설정 ---
 let gameState = 'START';
 let score = 0;
 let timer = 0;
@@ -46,22 +41,19 @@ let animationFrame;
 let playerName = "";
 
 let skyX = 0, midX = 0, groundX = 0;
-
-const GAME_SPEED = 6; 
+const GAME_SPEED = 6;
 let isBoosterActive = false;
 let boosterTimer = 0;
-let boostMultiplier = 1.0; 
-const BOOSTER_DURATION = 240; 
-const MAX_BOOSTER_MULTIPLIER = 2.2; // 밸런스 조정됨
-const ACCEL_RATE = 0.04;
-const DECEL_RATE = 0.02;
+let boostMultiplier = 1.0;
+const BOOSTER_DURATION = 240;
+const MAX_BOOSTER_MULTIPLIER = 2.2;
 
-let obstacleTimerMax = 60; 
-let obstacleTimer = 0; 
+let obstacleTimerMax = 60;
+let obstacleTimer = 0;
 let itemMeatTimerMax = 600;
 let itemMeatTimer = 0;
 
-// --- 3. 플레이어 ---
+// --- 플레이어 ---
 const player = {
     x: 100, y: 265, width: 100, height: 70,
     dy: 0, jumpForce: 15, gravity: 0.7, isJumping: false, frame: 0,
@@ -86,7 +78,7 @@ const player = {
     }
 };
 
-// --- 4. 클래스 ---
+// --- 장애물/아이템 클래스 ---
 class Obstacle {
     constructor(offsetX = 0) {
         this.width = 60; this.height = 70;
@@ -103,7 +95,7 @@ class ItemMeat {
     update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
 }
 
-// --- 5. 배경 및 효과 ---
+// --- 배경/효과 ---
 function initSpeedLines() {
     speedLines = [];
     for (let i = 0; i < 15; i++) {
@@ -133,7 +125,7 @@ function drawBackground() {
     ctx.drawImage(assets.ground, Math.floor(groundX + canvas.width), 310, canvas.width + 1, 90);
 }
 
-// --- 6. 루프 및 시스템 ---
+// --- 게임 루프 ---
 function frame() {
     if (gameState !== 'PLAYING') return;
     animationFrame = requestAnimationFrame(frame);
@@ -148,8 +140,8 @@ function frame() {
 
     if (isBoosterActive) {
         boosterTimer--;
-        if (boosterTimer > BOOSTER_DURATION * 0.8) boostMultiplier += ACCEL_RATE;
-        else if (boosterTimer < BOOSTER_DURATION * 0.2) boostMultiplier -= DECEL_RATE;
+        if (boosterTimer > BOOSTER_DURATION * 0.8) boostMultiplier += 0.04;
+        else if (boosterTimer < BOOSTER_DURATION * 0.2) boostMultiplier -= 0.02;
         if (boostMultiplier > MAX_BOOSTER_MULTIPLIER) boostMultiplier = MAX_BOOSTER_MULTIPLIER;
         if (boostMultiplier < 1.0) boostMultiplier = 1.0;
         if (boosterTimer <= 0) isBoosterActive = false;
@@ -208,8 +200,8 @@ function resetGame() {
 
 function showRanking() {
     let ranks = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
-    let msg = ranks.length ? ranks.map((r, i) => `${i+1}위: ${r.name} (${r.score})`).join('\n') : "No Record";
-    alert("🏆 TOP 5 RANKING 🏆\n\n" + msg);
+    let msg = ranks.length ? ranks.map((r, i) => `${i+1}위: ${r.name} (${r.score})`).join('\n') : "기록이 없습니다.";
+    alert("🏆 TOP 5 랭킹 🏆\n\n" + msg);
 }
 
 // 이벤트 리스너
