@@ -35,7 +35,7 @@ assets.itemMeat.src = 'assets/images/item_meat.png';
 assets.bgmMain.loop = true;
 assets.bgmMain.volume = 0.4;
 
-// --- 2. 게임 변수 설정 ---
+// --- 2. 게임 변수 ---
 let gameState = 'START';
 let score = 0;
 let timer = 0;
@@ -45,45 +45,30 @@ let speedLines = [];
 let animationFrame;
 let playerName = "";
 
-let skyX = 0;
-let midX = 0;
-let groundX = 0;
+let skyX = 0, midX = 0, groundX = 0;
 
 const GAME_SPEED = 6; 
-
-// 부스터 모드 설정 (속도 밸런스 조정)
 let isBoosterActive = false;
 let boosterTimer = 0;
 let boostMultiplier = 1.0; 
 const BOOSTER_DURATION = 240; 
-const MAX_BOOSTER_MULTIPLIER = 2.2; // [수정] 3.0에서 2.2로 하향 조정 (반응 속도 확보)
-const ACCEL_RATE = 0.04; // [수정] 조금 더 부드러운 가속
-const DECEL_RATE = 0.02; 
+const MAX_BOOSTER_MULTIPLIER = 2.2; // 밸런스 조정됨
+const ACCEL_RATE = 0.04;
+const DECEL_RATE = 0.02;
 
 let obstacleTimerMax = 60; 
 let obstacleTimer = 0; 
-let itemMeatTimerMax = 600; 
+let itemMeatTimerMax = 600;
 let itemMeatTimer = 0;
 
 // --- 3. 플레이어 ---
 const player = {
-    x: 100,
-    y: 265,
-    width: 100,
-    height: 70,
-    dy: 0,
-    jumpForce: 15,
-    gravity: 0.7,
-    isJumping: false,
-    frame: 0,
-    
+    x: 100, y: 265, width: 100, height: 70,
+    dy: 0, jumpForce: 15, gravity: 0.7, isJumping: false, frame: 0,
     draw() {
         if (!this.isJumping) {
             if (timer % 8 === 0) this.frame = this.frame === 0 ? 1 : 0;
-        } else {
-            this.frame = 0; 
-        }
-
+        } else { this.frame = 0; }
         const currentImg = this.frame === 0 ? assets.character1 : assets.character2;
         if (currentImg.complete) {
             if (isBoosterActive && boostMultiplier > 1.2 && !this.isJumping) {
@@ -96,109 +81,63 @@ const player = {
         }
     },
     update() {
-        if (this.isJumping) {
-            this.y -= this.dy;
-            this.dy -= this.gravity;
-        }
-        if (this.y >= 265) {
-            this.y = 265;
-            this.isJumping = false;
-            this.dy = 0;
-        }
+        if (this.isJumping) { this.y -= this.dy; this.dy -= this.gravity; }
+        if (this.y >= 265) { this.y = 265; this.isJumping = false; this.dy = 0; }
     }
 };
 
-// --- 4. 장애물 & 아이템 ---
+// --- 4. 클래스 ---
 class Obstacle {
     constructor(offsetX = 0) {
-        this.width = 60;
-        this.height = 70;
-        this.x = canvas.width + offsetX;
-        this.y = 260;
+        this.width = 60; this.height = 70;
+        this.x = canvas.width + offsetX; this.y = 260;
         this.img = Math.random() > 0.5 ? assets.obs : assets.obs2;
     }
-    draw() {
-        if (this.img.complete) ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
-    }
-    update() {
-        this.x -= (GAME_SPEED + score / 500) * boostMultiplier;
-    }
+    draw() { if (this.img.complete) ctx.drawImage(this.img, this.x, this.y, this.width, this.height); }
+    update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
 }
 
 class ItemMeat {
-    constructor() {
-        this.width = 50;
-        this.height = 50;
-        this.x = canvas.width;
-        this.y = 280; 
-    }
-    draw() {
-        if (assets.itemMeat.complete) ctx.drawImage(assets.itemMeat, this.x, this.y, this.width, this.height);
-    }
-    update() {
-        this.x -= (GAME_SPEED + score / 500) * boostMultiplier;
-    }
+    constructor() { this.width = 50; this.height = 50; this.x = canvas.width; this.y = 280; }
+    draw() { if (assets.itemMeat.complete) ctx.drawImage(assets.itemMeat, this.x, this.y, this.width, this.height); }
+    update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
 }
 
-// --- 5. 효과 함수 ---
+// --- 5. 배경 및 효과 ---
 function initSpeedLines() {
     speedLines = [];
     for (let i = 0; i < 15; i++) {
-        speedLines.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * (canvas.height - 100),
-            length: 400 + Math.random() * 600,
-            speed: 20 + Math.random() * 30
-        });
+        speedLines.push({ x: Math.random() * canvas.width, y: Math.random() * (canvas.height - 100), length: 400 + Math.random() * 600, speed: 20 + Math.random() * 30 });
     }
 }
-
 function drawSpeedLines() {
     if (!isBoosterActive) return;
     const alpha = (boostMultiplier - 1.0) / (MAX_BOOSTER_MULTIPLIER - 1.0) * 0.4;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = 2;
     speedLines.forEach(line => {
-        ctx.beginPath();
-        ctx.moveTo(line.x, line.y);
-        ctx.lineTo(line.x + line.length, line.y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(line.x, line.y); ctx.lineTo(line.x + line.length, line.y); ctx.stroke();
         line.x -= line.speed * boostMultiplier;
-        if (line.x + line.length < 0) {
-            line.x = canvas.width + Math.random() * 200;
-            line.y = Math.random() * (canvas.height - 100);
-            line.length = 400 + Math.random() * 600;
-        }
+        if (line.x + line.length < 0) { line.x = canvas.width + Math.random() * 200; line.y = Math.random() * (canvas.height - 100); }
     });
 }
-
-// --- 6. 배경 렌더링 ---
 function drawBackground() {
-    const currentSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
-    skyX -= 0.5;
-    midX -= 1.8;
-    groundX -= currentSpeed; 
-
-    if (skyX <= -canvas.width) skyX = 0;
-    if (midX <= -canvas.width) midX = 0;
-    if (groundX <= -canvas.width) groundX = 0;
-
+    const curSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
+    skyX -= 0.5; midX -= 1.8; groundX -= curSpeed;
+    if (skyX <= -canvas.width) skyX = 0; if (midX <= -canvas.width) midX = 0; if (groundX <= -canvas.width) groundX = 0;
     ctx.drawImage(assets.sky, Math.floor(skyX), 0, canvas.width + 1, canvas.height);
     ctx.drawImage(assets.sky, Math.floor(skyX + canvas.width), 0, canvas.width + 1, canvas.height);
-    ctx.drawImage(assets.mid, Math.floor(midX), 100, canvas.width + 1, 230); 
+    ctx.drawImage(assets.mid, Math.floor(midX), 100, canvas.width + 1, 230);
     ctx.drawImage(assets.mid, Math.floor(midX + canvas.width), 100, canvas.width + 1, 230);
     drawSpeedLines();
-    ctx.drawImage(assets.ground, Math.floor(groundX), 310, canvas.width + 1, 90); 
+    ctx.drawImage(assets.ground, Math.floor(groundX), 310, canvas.width + 1, 90);
     ctx.drawImage(assets.ground, Math.floor(groundX + canvas.width), 310, canvas.width + 1, 90);
 }
 
-// --- 7. 메인 루프 ---
+// --- 6. 루프 및 시스템 ---
 function frame() {
     if (gameState !== 'PLAYING') return;
-    
     animationFrame = requestAnimationFrame(frame);
-    timer++;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    timer++; ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
 
     if (timer % 10 === 0) {
@@ -214,118 +153,65 @@ function frame() {
         if (boostMultiplier > MAX_BOOSTER_MULTIPLIER) boostMultiplier = MAX_BOOSTER_MULTIPLIER;
         if (boostMultiplier < 1.0) boostMultiplier = 1.0;
         if (boosterTimer <= 0) isBoosterActive = false;
-    } else {
-        boostMultiplier = 1.0;
-    }
+    } else { boostMultiplier = 1.0; }
 
     obstacleTimer++;
     if (obstacleTimer >= obstacleTimerMax) {
         obstacles.push(new Obstacle());
         if (Math.random() < 0.2) obstacles.push(new Obstacle(70));
-        obstacleTimerMax = 50 + Math.random() * 80;
-        obstacleTimer = 0;
+        obstacleTimerMax = 50 + Math.random() * 80; obstacleTimer = 0;
     }
 
     itemMeatTimer++;
     if (itemMeatTimer >= itemMeatTimerMax) {
-        let itemSafe = true;
-        obstacles.forEach(obs => {
-            if (Math.abs(canvas.width - obs.x) < 150) itemSafe = false;
-        });
-        if (itemSafe) {
-            items.push(new ItemMeat());
-            itemMeatTimerMax = 600 + Math.random() * 600;
-            itemMeatTimer = 0;
-        }
+        let safe = true; obstacles.forEach(o => { if (Math.abs(canvas.width - o.x) < 150) safe = false; });
+        if (safe) { items.push(new ItemMeat()); itemMeatTimerMax = 600 + Math.random() * 600; itemMeatTimer = 0; }
     }
 
-    obstacles.forEach((obs, i) => {
-        obs.update();
-        obs.draw();
-        // [수정] 무적 판정 삭제 -> 부스터 중에도 충돌하면 사망
-        if (checkCollision(player, obs)) {
-            endGame();
-        }
-        if (obs.x + obs.width < 0) obstacles.splice(i, 1);
-    });
+    obstacles.forEach((o, i) => { o.update(); o.draw(); if (checkCollision(player, o)) endGame(); if (o.x + o.width < 0) obstacles.splice(i, 1); });
+    items.forEach((m, i) => { m.update(); m.draw(); if (checkCollision(player, m)) { items.splice(i, 1); isBoosterActive = true; boosterTimer = BOOSTER_DURATION; initSpeedLines(); playSfx(assets.point); } if (m.x + m.width < 0) items.splice(i, 1); });
 
-    items.forEach((item, i) => {
-        item.update();
-        item.draw();
-        if (checkCollision(player, item)) {
-            items.splice(i, 1);
-            isBoosterActive = true;
-            boosterTimer = BOOSTER_DURATION;
-            initSpeedLines();
-            playSfx(assets.point);
-        }
-        if (item.x + item.width < 0) items.splice(i, 1);
-    });
-
-    player.update();
-    player.draw();
+    player.update(); player.draw();
 }
 
-// --- 8. 시스템 함수 ---
-function checkCollision(p, o) {
-    return !(p.x + 25 > o.x + o.width - 25 || 
-             p.x + p.width - 25 < o.x + 25 || 
-             p.y + 20 > o.y + o.height - 10 || 
-             p.y + p.height - 10 < o.y + 20);
-}
-
-function playSfx(audio) {
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-}
+function checkCollision(p, o) { return !(p.x + 25 > o.x + o.width - 25 || p.x + p.width - 25 < o.x + 25 || p.y + 20 > o.y + o.height - 10 || p.y + p.height - 10 < o.y + 20); }
+function playSfx(audio) { audio.currentTime = 0; audio.play().catch(() => {}); }
 
 function startGame() {
     playSfx(assets.start);
     playerName = document.getElementById('player-name').value || "GUEST";
     document.getElementById('ui-name').innerText = playerName;
     document.getElementById('start-screen').classList.add('hidden');
-    assets.bgmMain.play().catch(e => console.log("BGM Play Error:", e));
-    gameState = 'PLAYING';
-    frame();
+    assets.bgmMain.play().catch(() => {});
+    gameState = 'PLAYING'; frame();
 }
 
 function endGame() {
-    gameState = 'GAMEOVER';
-    cancelAnimationFrame(animationFrame);
-    assets.bgmMain.pause();
-    assets.bgmMain.currentTime = 0;
-    isBoosterActive = false;
-    boostMultiplier = 1.0;
-    playSfx(assets.die);
-    setTimeout(() => playSfx(assets.gameover), 600);
+    gameState = 'GAMEOVER'; cancelAnimationFrame(animationFrame);
+    assets.bgmMain.pause(); assets.bgmMain.currentTime = 0;
+    isBoosterActive = false; boostMultiplier = 1.0;
+    playSfx(assets.die); setTimeout(() => playSfx(assets.gameover), 600);
     document.getElementById('gameover-screen').classList.remove('hidden');
     document.getElementById('final-score').innerText = `Score: ${score}`;
-    let rankings = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
-    rankings.push({ name: playerName, score: score });
-    rankings.sort((a, b) => b.score - a.score);
-    localStorage.setItem('hyenaRank', JSON.stringify(rankings.slice(0, 5)));
+    let ranks = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
+    ranks.push({ name: playerName, score: score }); ranks.sort((a, b) => b.score - a.score);
+    localStorage.setItem('hyenaRank', JSON.stringify(ranks.slice(0, 5)));
 }
 
 function resetGame() {
-    score = 0; timer = 0; obstacles = []; items = [];
-    player.y = 265;
-    isBoosterActive = false;
-    boostMultiplier = 1.0;
+    score = 0; timer = 0; obstacles = []; items = []; player.y = 265;
+    isBoosterActive = false; boostMultiplier = 1.0;
     gameState = 'START';
     document.getElementById('gameover-screen').classList.add('hidden');
     document.getElementById('start-screen').classList.remove('hidden');
 }
 
 function showRanking() {
-    let rankings = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
-    let msg = rankings.length ? rankings.map((r, i) => `${i+1}위: ${r.name} (${r.score})`).join('\n') : "No Record";
+    let ranks = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
+    let msg = ranks.length ? ranks.map((r, i) => `${i+1}위: ${r.name} (${r.score})`).join('\n') : "No Record";
     alert("🏆 TOP 5 RANKING 🏆\n\n" + msg);
 }
 
-window.addEventListener('keydown', (e) => {
-    if ((e.code === 'Space' || e.code === 'ArrowUp') && !player.isJumping && gameState === 'PLAYING') {
-        player.isJumping = true;
-        player.dy = player.jumpForce;
-        playSfx(assets.jump);
-    }
-});
+// 이벤트 리스너
+window.addEventListener('keydown', (e) => { if ((e.code === 'Space' || e.code === 'ArrowUp') && !player.isJumping && gameState === 'PLAYING') { player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); } });
+window.addEventListener('touchstart', (e) => { if (gameState === 'PLAYING' && !player.isJumping) { player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); if (e.cancelable) e.preventDefault(); } }, { passive: false });
