@@ -5,39 +5,37 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh;
+    height: 100vh; /* 화면 전체 높이 사용 */
     overflow: hidden;
     font-family: Arial, sans-serif;
 }
 
 #ui-container {
     position: relative;
+    /* [수정] 너비와 높이를 유연하게 설정 */
     width: 1000px;
     height: 400px;
-    max-width: 100vw;
-    max-height: 100vh; /* 모바일 대응 비율 조정 */
+    max-width: 95vw;  /* 화면 너비의 95%를 넘지 않음 */
+    max-height: 95vh; /* 화면 높이의 95%를 넘지 않음 (여백 확보) */
+    
+    /* [추가] 가로세로 비율 유지 (2.5 : 1 비율) */
+    aspect-ratio: 1000 / 400;
 }
 
 /* 캔버스 설정 */
 canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     display: block;
     image-rendering: pixelated;
+    border: 2px solid #333;
+    box-sizing: border-box; /* 테두리 포함 크기 계산 */
 }
 
-/* 상단 점수 UI */
-#game-ui {
-    position: absolute;
-    top: 10px;
-    left: 15px;
-    z-index: 10;
-    color: white;
-    font-weight: bold;
-    text-shadow: 2px 2px 2px #000;
-}
-
-/* [수정] 시작 화면: 배경 왜곡 방지 및 세로 배치 */
+/* 시작 화면: 배경 왜곡 방지 및 크기 조절 */
 #start-screen {
     position: absolute;
     top: 0;
@@ -45,89 +43,30 @@ canvas {
     width: 100%;
     height: 100%;
     background-image: url('assets/images/start_bg.png');
-    background-size: cover; /* [중요] 비율 유지하며 가득 채움 (찌그러짐 방지) */
+    background-size: contain; /* [변경] 이미지가 잘리지 않게 전체 다 보여줌 */
+    background-repeat: no-repeat;
     background-position: center;
     display: flex;
-    flex-direction: column; /* [중요] 요소를 세로로 한 줄씩 배치 */
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 100;
-    padding-top: 120px; /* 로고 아래 공간 확보 */
 }
 
-/* [수정] 입력창과 버튼을 묶는 컨테이너 */
+/* UI 그룹 (입력창, 버튼) */
 #ui-group {
     display: flex;
-    flex-direction: column; /* 세로 배치 */
+    flex-direction: column;
     align-items: center;
-    gap: 15px; /* 요소 사이 간격 */
+    gap: 10px;
+    /* [추가] 모바일에서 버튼이 너무 커서 잘리는 것 방지 */
+    transform: scale(0.8); 
 }
 
-/* 입력창 스타일 */
-input[type="text"] {
-    padding: 12px;
-    font-size: 16px;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    width: 250px;
-    text-align: center;
-}
-
-/* 버튼 공통 스타일 */
-button {
-    padding: 12px 24px;
-    font-size: 18px;
-    font-weight: bold;
-    cursor: pointer;
-    border: none;
-    border-radius: 6px;
-    color: white; /* 글자색 흰색 */
-    width: 200px; /* 버튼 너비 통일 */
-    transition: background-color 0.2s;
-}
-
-/* [수정] 스타트 버튼: 주황색 */
-.btn-start {
-    background-color: #e67e22; /* 주황색 */
-}
-.btn-start:hover {
-    background-color: #d35400;
-}
-
-/* [수정] 랭킹 버튼: 녹색 */
-.btn-rank {
-    background-color: #27ae60; /* 녹색 */
-}
-.btn-rank:hover {
-    background-color: #219150;
-}
-
-/* 게임오버 화면 (팝업 방식) */
-#gameover-screen {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.85);
-    padding: 30px;
-    border-radius: 15px;
-    text-align: center;
-    color: white;
-    z-index: 110;
-    min-width: 300px;
-}
-
-#gameover-screen button {
-    background-color: #fff;
-    color: #333;
-    width: auto;
-    margin: 5px;
-}
-#gameover-screen button:hover {
-    background-color: #ddd;
-}
-
-/* 숨김 처리 */
-.hidden {
-    display: none !important;
+/* 모바일용 작은 화면 대응 (추가 미디어 쿼리) */
+@media (max-height: 500px) {
+    #ui-group {
+        transform: scale(0.6); /* 화면 높이가 낮으면 더 작게 조절 */
+        gap: 5px;
+    }
 }
