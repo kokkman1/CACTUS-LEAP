@@ -27,7 +27,7 @@ assets.obs.src = 'assets/images/obstacle.png';
 assets.obs2.src = 'assets/images/obstacle2.png';
 assets.itemMeat.src = 'assets/images/item_meat.png';
 
-// 사운드 사전 로드 설정 (지연 방지)
+// 사운드 사전 로드 설정
 Object.values(assets).forEach(asset => {
     if (asset instanceof Audio) {
         asset.preload = 'auto';
@@ -38,10 +38,14 @@ Object.values(assets).forEach(asset => {
 assets.bgmMain.loop = true;
 assets.bgmMain.volume = 0.4;
 
-// --- 2. [수정] 기기별 속도 제어 (더 천천히) ---
+// --- 2. 기기별 밸런스 제어 (모바일 전용 수정) ---
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-// 기존 0.7에서 0.5로 하향 (PC 대비 절반 속도)
-const speedAdjustment = isMobile ? 0.5 : 1.0; 
+
+// [수정] 모바일 속도: 0.5는 너무 느리고 0.7은 빨랐으므로 0.6으로 설정
+const speedAdjustment = isMobile ? 0.6 : 1.0; 
+
+// [수정] 모바일 점프력: 선인장 2개를 넘기 위해 모바일일 때 점프 힘을 소폭 강화 (기존 15 -> 16.5)
+const mobileJumpBoost = isMobile ? 16.5 : 15;
 
 let gameState = 'START';
 let score = 0;
@@ -69,7 +73,11 @@ let itemMeatTimer = 0;
 // --- 3. 플레이어 ---
 const player = {
     x: 100, y: 265, width: 100, height: 70,
-    dy: 0, jumpForce: 15, gravity: 0.7, isJumping: false, frame: 0,
+    dy: 0, 
+    jumpForce: mobileJumpBoost, // 기기별 설정된 점프 힘 적용
+    gravity: 0.7, 
+    isJumping: false, 
+    frame: 0,
     draw() {
         if (!this.isJumping) {
             if (timer % 8 === 0) this.frame = this.frame === 0 ? 1 : 0;
@@ -109,18 +117,6 @@ class ItemMeat {
 }
 
 // --- 5. 배경 및 효과 ---
-function initSpeedLines() {
-    speedLines = [];
-    for (let i = 0; i < 15; i++) {
-        speedLines.push({ 
-            x: Math.random() * canvas.width, 
-            y: Math.random() * (canvas.height - 100), 
-            length: 400 + Math.random() * 600, 
-            speed: (20 + Math.random() * 30) * speedAdjustment 
-        });
-    }
-}
-
 function drawBackground() {
     const curSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
     skyX -= 0.5 * speedAdjustment; 
@@ -210,19 +206,13 @@ function checkCollision(p, o) {
              p.y + 20 > o.y + o.height - 10 || p.y + p.height - 10 < o.y + 20); 
 }
 
-// [수정] 사운드 지연 최소화 함수
 function playSfx(audio) {
     if (!audio) return;
-    // 오디오를 처음부터 다시 재생하도록 강제 설정
     audio.pause();
     audio.currentTime = 0;
-    
-    // 비동기 재생으로 지연 최소화
     const playPromise = audio.play();
     if (playPromise !== undefined) {
-        playPromise.catch(() => {
-            // 자동 재생 방지 대응 (사용자 상호작용 후 재생)
-        });
+        playPromise.catch(() => {});
     }
 }
 
@@ -231,7 +221,6 @@ function startGame() {
     playerName = document.getElementById('player-name').value || "GUEST";
     document.getElementById('ui-name').innerText = playerName;
     document.getElementById('start-screen').classList.add('hidden');
-    // BGM 시작 시 모바일 오디오 컨텍스트 활성화 유도
     assets.bgmMain.play().catch(() => {});
     gameState = 'PLAYING'; frame();
 }
@@ -241,7 +230,7 @@ function endGame() {
     assets.bgmMain.pause(); assets.bgmMain.currentTime = 0;
     isBoosterActive = false; boostMultiplier = 1.0;
     playSfx(assets.die); 
-    setTimeout(() => playSfx(assets.gameover), 300); // 딜레이 시간 단축
+    setTimeout(() => playSfx(assets.gameover), 300);
     document.getElementById('gameover-screen').classList.remove('hidden');
     document.getElementById('final-score').innerText = `Score: ${score}`;
     
