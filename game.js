@@ -13,6 +13,7 @@ const assets = {
     character2: new Image(),
     obs: new Image(),
     obs2: new Image(),
+    itemMeat: new Image(), // 얼룩말 고기 아이템 이미지
     bgm: new Audio('assets/sounds/bgm_main.mp3'),
     jump: new Audio('assets/sounds/sfx_jump.mp3'),
     die: new Audio('assets/sounds/sfx_die.mp3'),
@@ -28,6 +29,7 @@ assets.character1.src = 'assets/images/character.png';
 assets.character2.src = 'assets/images/character_run2.png';
 assets.obs.src = 'assets/images/obstacle.png';
 assets.obs2.src = 'assets/images/obstacle2.png';
+assets.itemMeat.src = 'assets/images/item_meat.png'; // 아이템 경로
 
 assets.bgm.loop = true;
 assets.bgm.volume = 0.4;
@@ -37,6 +39,7 @@ let gameState = 'START';
 let score = 0;
 let timer = 0;
 let obstacles = [];
+let items = []; // 아이템 저장 배열
 let animationFrame;
 let playerName = "";
 
@@ -44,8 +47,21 @@ let skyX = 0;
 let midX = 0;
 let groundX = 0;
 
-// 바닥과 장애물의 속도를 통일하기 위한 기준 변수
+// 바닥과 장애물의 기준 속도
 const GAME_SPEED = 6; 
+
+// 부스터 모드 관련 변수
+let isBoosterActive = false;
+let boosterTimer = 0;
+const BOOSTER_DURATION = 180; // 부스터 지속 시간 (약 3초)
+const BOOSTER_SPEED = 18;     // 부스터 시 속도 (3배)
+const BOOSTER_POINT_MULTIPLIER = 5; // 부스터 시 점수 획득 배율
+
+// 장애물 및 아이템 생성 타이머 변수
+let obstacleTimerMax = 120; 
+let obstacleTimer = 0; 
+let itemMeatTimerMax = 600; 
+let itemMeatTimer = 0;
 
 // --- 3. 플레이어 (하이에나) ---
 const player = {
@@ -60,15 +76,21 @@ const player = {
     frame: 0,
     
     draw() {
-        // [수정] 점프 중일 때는 발 동작 프레임을 고정
         if (!this.isJumping) {
             if (timer % 8 === 0) this.frame = this.frame === 0 ? 1 : 0;
         } else {
-            this.frame = 0; // 점프 시에는 첫 번째 자세로 고정
+            this.frame = 0; 
         }
 
         const currentImg = this.frame === 0 ? assets.character1 : assets.character2;
         if (currentImg.complete) {
+            // 부스터 모드 시 노란색 파티클 효과
+            if (isBoosterActive) {
+                for (let i = 0; i < 5; i++) {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.fillRect(this.x + Math.random() * this.width, this.y + this.height + (Math.random() * 10), 4, 4);
+                }
+            }
             ctx.drawImage(currentImg, this.x, this.y, this.width, this.height);
         }
     },
@@ -101,18 +123,36 @@ class Obstacle {
         }
     }
     update() {
-        // [수정] 바닥 이동 속도와 동일하게 설정
-        this.x -= (GAME_SPEED + score / 500);
+        const currentSpeed = isBoosterActive ? BOOSTER_SPEED : (GAME_SPEED + score / 500);
+        this.x -= currentSpeed;
     }
 }
 
-// --- 5. 게임 기능 함수 ---
+// --- 5. 아이템 (얼룩말 고기) ---
+class ItemMeat {
+    constructor() {
+        this.width = 50;
+        this.height = 50;
+        this.x = canvas.width;
+        this.y = 150 + Math.random() * 100; // 공중에 떠 있는 높이 랜덤
+    }
+    draw() {
+        if (assets.itemMeat.complete) {
+            ctx.drawImage(assets.itemMeat, this.x, this.y, this.width, this.height);
+        }
+    }
+    update() {
+        const currentSpeed = isBoosterActive ? BOOSTER_SPEED : (GAME_SPEED + score / 500);
+        this.x -= currentSpeed;
+    }
+}
+
+// --- 6. 게임 기능 함수 ---
 function playSfx(audio) {
     audio.currentTime = 0;
     audio.play().catch(() => {});
 }
 
-// 점수 강조 효과 (500점 단위)
 function bumpScoreUI() {
     const scoreElement = document.getElementById('ui-score');
     scoreElement.classList.add('score-bump');
@@ -122,11 +162,11 @@ function bumpScoreUI() {
 }
 
 function drawBackground() {
-    const currentSpeed = (GAME_SPEED + score / 500);
+    const currentSpeed = isBoosterActive ? BOOSTER_SPEED : (GAME_SPEED + score / 500);
     
     skyX -= 0.5;
     midX -= 1.8;
-    groundX -= currentSpeed; // 장애물 속도와 동기화
+    groundX -= currentSpeed; 
 
     if (skyX <= -canvas.width) skyX = 0;
     if (midX <= -canvas.width) midX = 0;
@@ -151,9 +191,9 @@ function frame() {
 
     drawBackground();
 
+    // 점수 획득 로직
     if (timer % 10 === 0) {
-        score++;
-        // 500점 단위 강조 효과
+        score += isBoosterActive ? BOOSTER_POINT_MULTIPLIER : 1;
         if (score > 0 && score % 500 === 0) {
             playSfx(assets.point);
             bumpScoreUI();
@@ -161,10 +201,29 @@ function frame() {
     }
     document.getElementById('ui-score').innerText = score;
 
-    if (timer % 120 === 0) {
-        obstacles.push(new Obstacle());
+    // 부스터 타이머 처리
+    if (isBoosterActive) {
+        boosterTimer--;
+        if (boosterTimer <= 0) isBoosterActive = false;
     }
 
+    // 장애물 불규칙 생성
+    obstacleTimer++;
+    if (obstacleTimer >= obstacleTimerMax) {
+        obstacles.push(new Obstacle());
+        obstacleTimerMax = 100 + Math.random() * 100; // 생성 간격 랜덤화
+        obstacleTimer = 0;
+    }
+
+    // 아이템 불규칙 생성
+    itemMeatTimer++;
+    if (itemMeatTimer >= itemMeatTimerMax) {
+        items.push(new ItemMeat());
+        itemMeatTimerMax = 500 + Math.random() * 500;
+        itemMeatTimer = 0;
+    }
+
+    // 장애물 업데이트 및 충돌 체크
     obstacles.forEach((obs, i) => {
         obs.update();
         obs.draw();
@@ -172,18 +231,31 @@ function frame() {
         if (obs.x + obs.width < 0) obstacles.splice(i, 1);
     });
 
+    // 아이템 업데이트 및 충돌 체크
+    items.forEach((item, i) => {
+        item.update();
+        item.draw();
+        if (checkCollision(player, item)) {
+            items.splice(i, 1);
+            isBoosterActive = true;
+            boosterTimer = BOOSTER_DURATION;
+            playSfx(assets.point);
+            bumpScoreUI();
+        }
+        if (item.x + item.width < 0) items.splice(i, 1);
+    });
+
     player.update();
     player.draw();
 }
 
 function checkCollision(p, o) {
-    return !(p.x + 20 > o.x + o.width - 20 || 
-             p.x + p.width - 20 < o.x + 20 || 
+    return !(p.x + 25 > o.x + o.width - 25 || 
+             p.x + p.width - 25 < o.x + 25 || 
              p.y + 20 > o.y + o.height - 10 || 
              p.y + p.height - 10 < o.y + 20);
 }
 
-// --- 6. 시스템 제어 ---
 function startGame() {
     playerName = document.getElementById('player-name').value || "GUEST";
     document.getElementById('ui-name').innerText = playerName;
@@ -199,6 +271,7 @@ function endGame() {
     cancelAnimationFrame(animationFrame);
     assets.bgm.pause();
     assets.bgm.currentTime = 0;
+    isBoosterActive = false;
     
     playSfx(assets.die);
     setTimeout(() => playSfx(assets.gameover), 600);
@@ -213,8 +286,9 @@ function endGame() {
 }
 
 function resetGame() {
-    score = 0; timer = 0; obstacles = [];
+    score = 0; timer = 0; obstacles = []; items = [];
     player.y = 265;
+    isBoosterActive = false;
     gameState = 'START';
     document.getElementById('gameover-screen').classList.add('hidden');
     document.getElementById('start-screen').classList.remove('hidden');
