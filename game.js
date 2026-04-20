@@ -3,8 +3,6 @@ const ctx = canvas.getContext('2d');
 
 canvas.width = 1000;
 canvas.height = 400;
-
-// [추가] 픽셀 아트의 선명도를 유지하고 경계선 노이즈를 방지
 ctx.imageSmoothingEnabled = false;
 
 // --- 1. 에셋 로드 ---
@@ -17,12 +15,12 @@ const assets = {
     obs: new Image(),
     obs2: new Image(),
     itemMeat: new Image(),
-    bgm: new Audio('assets/sounds/bgm_main.mp3'),
+    bgmMain: new Audio('assets/sounds/bgm_main.mp3'),
     jump: new Audio('assets/sounds/sfx_jump.mp3'),
     die: new Audio('assets/sounds/sfx_die.mp3'),
     gameover: new Audio('assets/sounds/game_over.mp3'),
-    land: new Audio('assets/sounds/landing_on_ground_sfx.mp3'),
-    point: new Audio('assets/sounds/sfx_point.mp3')
+    point: new Audio('assets/sounds/sfx_point.mp3'),
+    start: new Audio('assets/sounds/sfx_start.mp3')
 };
 
 assets.sky.src = 'assets/images/sky.png';
@@ -34,8 +32,8 @@ assets.obs.src = 'assets/images/obstacle.png';
 assets.obs2.src = 'assets/images/obstacle2.png';
 assets.itemMeat.src = 'assets/images/item_meat.png';
 
-assets.bgm.loop = true;
-assets.bgm.volume = 0.4;
+assets.bgmMain.loop = true;
+assets.bgmMain.volume = 0.4;
 
 // --- 2. 게임 변수 설정 ---
 let gameState = 'START';
@@ -53,21 +51,21 @@ let groundX = 0;
 
 const GAME_SPEED = 6; 
 
+// 부스터 모드 설정 (속도 밸런스 조정)
 let isBoosterActive = false;
 let boosterTimer = 0;
 let boostMultiplier = 1.0; 
 const BOOSTER_DURATION = 240; 
-const MAX_BOOSTER_MULTIPLIER = 3.0; 
-const ACCEL_RATE = 0.05; 
+const MAX_BOOSTER_MULTIPLIER = 2.2; // [수정] 3.0에서 2.2로 하향 조정 (반응 속도 확보)
+const ACCEL_RATE = 0.04; // [수정] 조금 더 부드러운 가속
 const DECEL_RATE = 0.02; 
-const BOOSTER_POINT_MULTIPLIER = 5; 
 
-let obstacleTimerMax = 120; 
+let obstacleTimerMax = 60; 
 let obstacleTimer = 0; 
-let itemMeatTimerMax = 700; 
+let itemMeatTimerMax = 600; 
 let itemMeatTimer = 0;
 
-// --- 3. 플레이어 (하이에나) ---
+// --- 3. 플레이어 ---
 const player = {
     x: 100,
     y: 265,
@@ -88,10 +86,10 @@ const player = {
 
         const currentImg = this.frame === 0 ? assets.character1 : assets.character2;
         if (currentImg.complete) {
-            if (isBoosterActive && boostMultiplier > 1.2) {
+            if (isBoosterActive && boostMultiplier > 1.2 && !this.isJumping) {
                 for (let i = 0; i < 5; i++) {
                     ctx.fillStyle = '#f1c40f';
-                    ctx.fillRect(this.x + Math.random() * this.width, this.y + this.height + (Math.random() * 10), 4, 4);
+                    ctx.fillRect(this.x + Math.random() * (this.width * 0.8), this.y + this.height - 5 + (Math.random() * 10), 4, 4);
                 }
             }
             ctx.drawImage(currentImg, this.x, this.y, this.width, this.height);
@@ -103,7 +101,6 @@ const player = {
             this.dy -= this.gravity;
         }
         if (this.y >= 265) {
-            if (this.isJumping) playSfx(assets.land);
             this.y = 265;
             this.isJumping = false;
             this.dy = 0;
@@ -113,10 +110,10 @@ const player = {
 
 // --- 4. 장애물 & 아이템 ---
 class Obstacle {
-    constructor() {
+    constructor(offsetX = 0) {
         this.width = 60;
         this.height = 70;
-        this.x = canvas.width;
+        this.x = canvas.width + offsetX;
         this.y = 260;
         this.img = Math.random() > 0.5 ? assets.obs : assets.obs2;
     }
@@ -129,10 +126,10 @@ class Obstacle {
 }
 
 class ItemMeat {
-    constructor(xPos) {
+    constructor() {
         this.width = 50;
         this.height = 50;
-        this.x = xPos || canvas.width;
+        this.x = canvas.width;
         this.y = 280; 
     }
     draw() {
@@ -175,10 +172,9 @@ function drawSpeedLines() {
     });
 }
 
-// --- 6. 배경 그리기 (흰 선 방지 보정) ---
+// --- 6. 배경 렌더링 ---
 function drawBackground() {
     const currentSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
-    
     skyX -= 0.5;
     midX -= 1.8;
     groundX -= currentSpeed; 
@@ -187,15 +183,11 @@ function drawBackground() {
     if (midX <= -canvas.width) midX = 0;
     if (groundX <= -canvas.width) groundX = 0;
 
-    // [수정] 이미지 사이에 1px 겹침을 주어 미세한 흰 선 방지
     ctx.drawImage(assets.sky, Math.floor(skyX), 0, canvas.width + 1, canvas.height);
     ctx.drawImage(assets.sky, Math.floor(skyX + canvas.width), 0, canvas.width + 1, canvas.height);
-    
     ctx.drawImage(assets.mid, Math.floor(midX), 100, canvas.width + 1, 230); 
     ctx.drawImage(assets.mid, Math.floor(midX + canvas.width), 100, canvas.width + 1, 230);
-
     drawSpeedLines();
-
     ctx.drawImage(assets.ground, Math.floor(groundX), 310, canvas.width + 1, 90); 
     ctx.drawImage(assets.ground, Math.floor(groundX + canvas.width), 310, canvas.width + 1, 90);
 }
@@ -207,17 +199,14 @@ function frame() {
     animationFrame = requestAnimationFrame(frame);
     timer++;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     drawBackground();
 
-    // UI 점수
     if (timer % 10 === 0) {
-        const pointWeight = 1.0 + (boostMultiplier - 1.0) * (BOOSTER_POINT_MULTIPLIER - 1) / (MAX_BOOSTER_MULTIPLIER - 1);
+        const pointWeight = 1.0 + (boostMultiplier - 1.0) * (5 - 1) / (MAX_BOOSTER_MULTIPLIER - 1.0);
         score += Math.round(pointWeight);
     }
     document.getElementById('ui-score').innerText = score;
 
-    // 부스터 가감속
     if (isBoosterActive) {
         boosterTimer--;
         if (boosterTimer > BOOSTER_DURATION * 0.8) boostMultiplier += ACCEL_RATE;
@@ -229,29 +218,23 @@ function frame() {
         boostMultiplier = 1.0;
     }
 
-    // 장애물 생성
     obstacleTimer++;
     if (obstacleTimer >= obstacleTimerMax) {
         obstacles.push(new Obstacle());
-        obstacleTimerMax = 100 + Math.random() * 100;
+        if (Math.random() < 0.2) obstacles.push(new Obstacle(70));
+        obstacleTimerMax = 50 + Math.random() * 80;
         obstacleTimer = 0;
     }
 
-    // [수정] 아이템 생성 시 장애물과 겹침 체크
     itemMeatTimer++;
     if (itemMeatTimer >= itemMeatTimerMax) {
-        let safeToSpawn = true;
-        const minDistance = 150; // 장애물과의 최소 안전 거리
-
+        let itemSafe = true;
         obstacles.forEach(obs => {
-            if (Math.abs(canvas.width - obs.x) < minDistance) {
-                safeToSpawn = false;
-            }
+            if (Math.abs(canvas.width - obs.x) < 150) itemSafe = false;
         });
-
-        if (safeToSpawn) {
+        if (itemSafe) {
             items.push(new ItemMeat());
-            itemMeatTimerMax = 500 + Math.random() * 500;
+            itemMeatTimerMax = 600 + Math.random() * 600;
             itemMeatTimer = 0;
         }
     }
@@ -259,7 +242,10 @@ function frame() {
     obstacles.forEach((obs, i) => {
         obs.update();
         obs.draw();
-        if (checkCollision(player, obs)) endGame();
+        // [수정] 무적 판정 삭제 -> 부스터 중에도 충돌하면 사망
+        if (checkCollision(player, obs)) {
+            endGame();
+        }
         if (obs.x + obs.width < 0) obstacles.splice(i, 1);
     });
 
@@ -280,24 +266,36 @@ function frame() {
     player.draw();
 }
 
-// 충돌 및 게임 제어 함수들은 이전과 동일
+// --- 8. 시스템 함수 ---
 function checkCollision(p, o) {
-    return !(p.x + 25 > o.x + o.width - 25 || p.x + p.width - 25 < o.x + 25 || p.y + 20 > o.y + o.height - 10 || p.y + p.height - 10 < o.y + 20);
+    return !(p.x + 25 > o.x + o.width - 25 || 
+             p.x + p.width - 25 < o.x + 25 || 
+             p.y + 20 > o.y + o.height - 10 || 
+             p.y + p.height - 10 < o.y + 20);
 }
-function playSfx(audio) { audio.currentTime = 0; audio.play().catch(() => {}); }
+
+function playSfx(audio) {
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+}
+
 function startGame() {
+    playSfx(assets.start);
     playerName = document.getElementById('player-name').value || "GUEST";
     document.getElementById('ui-name').innerText = playerName;
     document.getElementById('start-screen').classList.add('hidden');
-    assets.bgm.play();
+    assets.bgmMain.play().catch(e => console.log("BGM Play Error:", e));
     gameState = 'PLAYING';
     frame();
 }
+
 function endGame() {
     gameState = 'GAMEOVER';
     cancelAnimationFrame(animationFrame);
-    assets.bgm.pause(); assets.bgm.currentTime = 0;
-    isBoosterActive = false; boostMultiplier = 1.0;
+    assets.bgmMain.pause();
+    assets.bgmMain.currentTime = 0;
+    isBoosterActive = false;
+    boostMultiplier = 1.0;
     playSfx(assets.die);
     setTimeout(() => playSfx(assets.gameover), 600);
     document.getElementById('gameover-screen').classList.remove('hidden');
@@ -307,20 +305,27 @@ function endGame() {
     rankings.sort((a, b) => b.score - a.score);
     localStorage.setItem('hyenaRank', JSON.stringify(rankings.slice(0, 5)));
 }
+
 function resetGame() {
     score = 0; timer = 0; obstacles = []; items = [];
-    player.y = 265; isBoosterActive = false; boostMultiplier = 1.0;
+    player.y = 265;
+    isBoosterActive = false;
+    boostMultiplier = 1.0;
     gameState = 'START';
     document.getElementById('gameover-screen').classList.add('hidden');
     document.getElementById('start-screen').classList.remove('hidden');
 }
+
 function showRanking() {
     let rankings = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
     let msg = rankings.length ? rankings.map((r, i) => `${i+1}위: ${r.name} (${r.score})`).join('\n') : "No Record";
     alert("🏆 TOP 5 RANKING 🏆\n\n" + msg);
 }
+
 window.addEventListener('keydown', (e) => {
     if ((e.code === 'Space' || e.code === 'ArrowUp') && !player.isJumping && gameState === 'PLAYING') {
-        player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump);
+        player.isJumping = true;
+        player.dy = player.jumpForce;
+        playSfx(assets.jump);
     }
 });
