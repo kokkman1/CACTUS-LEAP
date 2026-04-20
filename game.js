@@ -27,12 +27,21 @@ assets.obs.src = 'assets/images/obstacle.png';
 assets.obs2.src = 'assets/images/obstacle2.png';
 assets.itemMeat.src = 'assets/images/item_meat.png';
 
+// 사운드 사전 로드 설정 (지연 방지)
+Object.values(assets).forEach(asset => {
+    if (asset instanceof Audio) {
+        asset.preload = 'auto';
+        asset.load();
+    }
+});
+
 assets.bgmMain.loop = true;
 assets.bgmMain.volume = 0.4;
 
-// --- 2. [보완] 기기별 속도 제어 변수 ---
+// --- 2. [수정] 기기별 속도 제어 (더 천천히) ---
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-const speedAdjustment = isMobile ? 0.7 : 1.0; // 모바일은 70% 속도로 보정
+// 기존 0.7에서 0.5로 하향 (PC 대비 절반 속도)
+const speedAdjustment = isMobile ? 0.5 : 1.0; 
 
 let gameState = 'START';
 let score = 0;
@@ -44,8 +53,6 @@ let animationFrame;
 let playerName = "";
 
 let skyX = 0, midX = 0, groundX = 0;
-
-// 모바일 보정값이 적용된 게임 속도
 const GAME_SPEED = 6 * speedAdjustment; 
 
 let isBoosterActive = false;
@@ -84,7 +91,7 @@ const player = {
     }
 };
 
-// --- 4. 클래스 (장애물 및 아이템) ---
+// --- 4. 클래스 ---
 class Obstacle {
     constructor(offsetX = 0) {
         this.width = 60; this.height = 70;
@@ -92,10 +99,7 @@ class Obstacle {
         this.img = Math.random() > 0.5 ? assets.obs : assets.obs2;
     }
     draw() { if (this.img.complete) ctx.drawImage(this.img, this.x, this.y, this.width, this.height); }
-    update() { 
-        // 전체 속도에 보정값 적용
-        this.x -= (GAME_SPEED + score / 500) * boostMultiplier; 
-    }
+    update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
 }
 
 class ItemMeat {
@@ -112,29 +116,13 @@ function initSpeedLines() {
             x: Math.random() * canvas.width, 
             y: Math.random() * (canvas.height - 100), 
             length: 400 + Math.random() * 600, 
-            speed: (20 + Math.random() * 30) * speedAdjustment // 효과 속도도 보정
+            speed: (20 + Math.random() * 30) * speedAdjustment 
         });
     }
 }
 
-function drawSpeedLines() {
-    if (!isBoosterActive) return;
-    const alpha = (boostMultiplier - 1.0) / (MAX_BOOSTER_MULTIPLIER - 1.0) * 0.4;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = 2;
-    speedLines.forEach(line => {
-        ctx.beginPath(); ctx.moveTo(line.x, line.y); ctx.lineTo(line.x + line.length, line.y); ctx.stroke();
-        line.x -= line.speed * boostMultiplier;
-        if (line.x + line.length < 0) { 
-            line.x = canvas.width + Math.random() * 200; 
-            line.y = Math.random() * (canvas.height - 100); 
-        }
-    });
-}
-
 function drawBackground() {
     const curSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
-    
-    // 배경 흐름 속도에 보정값 적용
     skyX -= 0.5 * speedAdjustment; 
     midX -= 1.8 * speedAdjustment; 
     groundX -= curSpeed;
@@ -148,27 +136,33 @@ function drawBackground() {
     ctx.drawImage(assets.mid, Math.floor(midX), 100, canvas.width + 1, 230);
     ctx.drawImage(assets.mid, Math.floor(midX + canvas.width), 100, canvas.width + 1, 230);
     
-    drawSpeedLines();
+    if (isBoosterActive) {
+        const alpha = (boostMultiplier - 1.0) / (MAX_BOOSTER_MULTIPLIER - 1.0) * 0.4;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = 2;
+        speedLines.forEach(line => {
+            ctx.beginPath(); ctx.moveTo(line.x, line.y); ctx.lineTo(line.x + line.length, line.y); ctx.stroke();
+            line.x -= line.speed * boostMultiplier;
+            if (line.x + line.length < 0) { line.x = canvas.width + Math.random() * 200; line.y = Math.random() * (canvas.height - 100); }
+        });
+    }
 
     ctx.drawImage(assets.ground, Math.floor(groundX), 310, canvas.width + 1, 90);
     ctx.drawImage(assets.ground, Math.floor(groundX + canvas.width), 310, canvas.width + 1, 90);
 }
 
-// --- 6. 게임 루프 및 시스템 ---
+// --- 6. 게임 루프 ---
 function frame() {
     if (gameState !== 'PLAYING') return;
     animationFrame = requestAnimationFrame(frame);
     timer++; ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
 
-    // 점수 증가 속도 조절
     if (timer % 10 === 0) {
         const pointWeight = 1.0 + (boostMultiplier - 1.0) * (5 - 1) / (MAX_BOOSTER_MULTIPLIER - 1.0);
         score += Math.round(pointWeight);
     }
     document.getElementById('ui-score').innerText = score;
 
-    // 부스터 로직
     if (isBoosterActive) {
         boosterTimer--;
         if (boosterTimer > BOOSTER_DURATION * 0.8) boostMultiplier += 0.04;
@@ -178,7 +172,6 @@ function frame() {
         if (boosterTimer <= 0) isBoosterActive = false;
     } else { boostMultiplier = 1.0; }
 
-    // 장애물 생성 (모바일 보정에 따라 간격 조절 가능)
     obstacleTimer += 1 * speedAdjustment; 
     if (obstacleTimer >= obstacleTimerMax) {
         obstacles.push(new Obstacle());
@@ -187,19 +180,13 @@ function frame() {
         obstacleTimer = 0;
     }
 
-    // 아이템 생성
     itemMeatTimer++;
     if (itemMeatTimer >= itemMeatTimerMax) {
         let safe = true; 
         obstacles.forEach(o => { if (Math.abs(canvas.width - o.x) < 150) safe = false; });
-        if (safe) { 
-            items.push(new ItemMeat()); 
-            itemMeatTimerMax = 600 + Math.random() * 600; 
-            itemMeatTimer = 0; 
-        }
+        if (safe) { items.push(new ItemMeat()); itemMeatTimerMax = 600 + Math.random() * 600; itemMeatTimer = 0; }
     }
 
-    // 충돌 체크 및 업데이트
     obstacles.forEach((o, i) => { 
         o.update(); o.draw(); 
         if (checkCollision(player, o)) endGame(); 
@@ -209,11 +196,8 @@ function frame() {
     items.forEach((m, i) => { 
         m.update(); m.draw(); 
         if (checkCollision(player, m)) { 
-            items.splice(i, 1); 
-            isBoosterActive = true; 
-            boosterTimer = BOOSTER_DURATION; 
-            initSpeedLines(); 
-            playSfx(assets.point); 
+            items.splice(i, 1); isBoosterActive = true; boosterTimer = BOOSTER_DURATION; 
+            initSpeedLines(); playSfx(assets.point); 
         } 
         if (m.x + m.width < 0) items.splice(i, 1); 
     });
@@ -226,13 +210,28 @@ function checkCollision(p, o) {
              p.y + 20 > o.y + o.height - 10 || p.y + p.height - 10 < o.y + 20); 
 }
 
-function playSfx(audio) { audio.currentTime = 0; audio.play().catch(() => {}); }
+// [수정] 사운드 지연 최소화 함수
+function playSfx(audio) {
+    if (!audio) return;
+    // 오디오를 처음부터 다시 재생하도록 강제 설정
+    audio.pause();
+    audio.currentTime = 0;
+    
+    // 비동기 재생으로 지연 최소화
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(() => {
+            // 자동 재생 방지 대응 (사용자 상호작용 후 재생)
+        });
+    }
+}
 
 function startGame() {
     playSfx(assets.start);
     playerName = document.getElementById('player-name').value || "GUEST";
     document.getElementById('ui-name').innerText = playerName;
     document.getElementById('start-screen').classList.add('hidden');
+    // BGM 시작 시 모바일 오디오 컨텍스트 활성화 유도
     assets.bgmMain.play().catch(() => {});
     gameState = 'PLAYING'; frame();
 }
@@ -241,7 +240,8 @@ function endGame() {
     gameState = 'GAMEOVER'; cancelAnimationFrame(animationFrame);
     assets.bgmMain.pause(); assets.bgmMain.currentTime = 0;
     isBoosterActive = false; boostMultiplier = 1.0;
-    playSfx(assets.die); setTimeout(() => playSfx(assets.gameover), 600);
+    playSfx(assets.die); 
+    setTimeout(() => playSfx(assets.gameover), 300); // 딜레이 시간 단축
     document.getElementById('gameover-screen').classList.remove('hidden');
     document.getElementById('final-score').innerText = `Score: ${score}`;
     
@@ -265,7 +265,7 @@ function showRanking() {
     alert("🏆 TOP 5 랭킹 🏆\n\n" + msg);
 }
 
-// 이벤트 리스너 (키보드 및 터치)
+// 이벤트 리스너
 window.addEventListener('keydown', (e) => { 
     if ((e.code === 'Space' || e.code === 'ArrowUp') && !player.isJumping && gameState === 'PLAYING') { 
         player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); 
