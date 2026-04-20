@@ -50,17 +50,21 @@ let groundX = 0;
 // 바닥과 장애물의 기준 속도
 const GAME_SPEED = 6; 
 
-// 부스터 모드 관련 변수
+// [수정] 부스터 모드 관련 변수 및 로직
 let isBoosterActive = false;
 let boosterTimer = 0;
-const BOOSTER_DURATION = 180; // 부스터 지속 시간 (약 3초)
-const BOOSTER_SPEED = 18;     // 부스터 시 속도 (3배)
+let boostMultiplier = 1.0; // [추가] 현재 부스터 배율
+const BOOSTER_DURATION = 240; // [보정] 부드러운 전환을 위해 지속 시간 조금 늘림 (약 4초)
+const MAX_BOOSTER_MULTIPLIER = 3.0; // [추가] 최대 부스터 배율 (3배)
+const ACCEL_RATE = 0.05; // [추가] 프레임당 가속 비율
+const DECEL_RATE = 0.02; // [추가] 프레임당 감속 비율
+
 const BOOSTER_POINT_MULTIPLIER = 5; // 부스터 시 점수 획득 배율
 
 // 장애물 및 아이템 생성 타이머 변수
 let obstacleTimerMax = 120; 
 let obstacleTimer = 0; 
-let itemMeatTimerMax = 600; 
+let itemMeatTimerMax = 700; 
 let itemMeatTimer = 0;
 
 // --- 3. 플레이어 (하이에나) ---
@@ -84,8 +88,8 @@ const player = {
 
         const currentImg = this.frame === 0 ? assets.character1 : assets.character2;
         if (currentImg.complete) {
-            // 부스터 모드 시 노란색 파티클 효과
-            if (isBoosterActive) {
+            // [수정] 부스터 배율에 따라 시각 효과 강화
+            if (isBoosterActive && boostMultiplier > 1.2) {
                 for (let i = 0; i < 5; i++) {
                     ctx.fillStyle = '#f1c40f';
                     ctx.fillRect(this.x + Math.random() * this.width, this.y + this.height + (Math.random() * 10), 4, 4);
@@ -123,18 +127,20 @@ class Obstacle {
         }
     }
     update() {
-        const currentSpeed = isBoosterActive ? BOOSTER_SPEED : (GAME_SPEED + score / 500);
+        // [수정] 부스터 배율을 적용한 현재 속도 계산
+        const currentSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
         this.x -= currentSpeed;
     }
 }
 
-// --- 5. 아이템 (얼룩말 고기) ---
+// --- 5. [수정] 아이템 (얼룩말 고기) - 평지 배치 ---
 class ItemMeat {
     constructor() {
         this.width = 50;
         this.height = 50;
         this.x = canvas.width;
-        this.y = 150 + Math.random() * 100; // 공중에 떠 있는 높이 랜덤
+        // [수정] 아이템을 플레이어의 발높이(y=265)에 가깝게 고정 배치
+        this.y = 280; 
     }
     draw() {
         if (assets.itemMeat.complete) {
@@ -142,7 +148,7 @@ class ItemMeat {
         }
     }
     update() {
-        const currentSpeed = isBoosterActive ? BOOSTER_SPEED : (GAME_SPEED + score / 500);
+        const currentSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
         this.x -= currentSpeed;
     }
 }
@@ -162,7 +168,8 @@ function bumpScoreUI() {
 }
 
 function drawBackground() {
-    const currentSpeed = isBoosterActive ? BOOSTER_SPEED : (GAME_SPEED + score / 500);
+    // [수정] 배경 속도도 부스터 배율에 동기화
+    const currentSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
     
     skyX -= 0.5;
     midX -= 1.8;
@@ -193,7 +200,10 @@ function frame() {
 
     // 점수 획득 로직
     if (timer % 10 === 0) {
-        score += isBoosterActive ? BOOSTER_POINT_MULTIPLIER : 1;
+        // [수정] 부스터 배율에 따라 점수 가중치 부여
+        const pointWeight = 1.0 + (boostMultiplier - 1.0) * (BOOSTER_POINT_MULTIPLIER - 1) / (MAX_BOOSTER_MULTIPLIER - 1);
+        score += Math.round(pointWeight);
+
         if (score > 0 && score % 500 === 0) {
             playSfx(assets.point);
             bumpScoreUI();
@@ -201,10 +211,38 @@ function frame() {
     }
     document.getElementById('ui-score').innerText = score;
 
-    // 부스터 타이머 처리
+    // [수정] 부스터 모드 부드러운 전환 로직
     if (isBoosterActive) {
         boosterTimer--;
-        if (boosterTimer <= 0) isBoosterActive = false;
+        
+        // 서서히 가속
+        if (boosterTimer > BOOSTER_DURATION * 0.8) {
+            if (boostMultiplier < MAX_BOOSTER_MULTIPLIER) {
+                boostMultiplier += ACCEL_RATE;
+            } else {
+                boostMultiplier = MAX_BOOSTER_MULTIPLIER;
+            }
+        } 
+        // 일정 빠른 속도 유지 (BOOSTER_DURATION * 0.2 ~ BOOSTER_DURATION * 0.8)
+        else if (boosterTimer > BOOSTER_DURATION * 0.2) {
+            boostMultiplier = MAX_BOOSTER_MULTIPLIER;
+        } 
+        // 효과 멈출 때 즈음 서서히 감속
+        else if (boosterTimer > 0) {
+            if (boostMultiplier > 1.0) {
+                boostMultiplier -= DECEL_RATE;
+            } else {
+                boostMultiplier = 1.0;
+            }
+        }
+        
+        if (boosterTimer <= 0) {
+            isBoosterActive = false;
+            boostMultiplier = 1.0; // 마지막 안전장치
+        }
+    } else {
+        // 부스터 비활성화 시 배율 1.0으로 고정
+        boostMultiplier = 1.0;
     }
 
     // 장애물 불규칙 생성
@@ -238,6 +276,8 @@ function frame() {
         if (checkCollision(player, item)) {
             items.splice(i, 1);
             isBoosterActive = true;
+            // 부스터 시작 시 가속 로직을 위해 배율을 1.1로 설정
+            boostMultiplier = 1.1; 
             boosterTimer = BOOSTER_DURATION;
             playSfx(assets.point);
             bumpScoreUI();
@@ -272,6 +312,7 @@ function endGame() {
     assets.bgm.pause();
     assets.bgm.currentTime = 0;
     isBoosterActive = false;
+    boostMultiplier = 1.0; // 배율 초기화
     
     playSfx(assets.die);
     setTimeout(() => playSfx(assets.gameover), 600);
@@ -289,6 +330,7 @@ function resetGame() {
     score = 0; timer = 0; obstacles = []; items = [];
     player.y = 265;
     isBoosterActive = false;
+    boostMultiplier = 1.0; // 배율 초기화
     gameState = 'START';
     document.getElementById('gameover-screen').classList.add('hidden');
     document.getElementById('start-screen').classList.remove('hidden');
