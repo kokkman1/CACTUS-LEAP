@@ -37,16 +37,11 @@ Object.values(assets).forEach(asset => {
 assets.bgmMain.loop = true;
 assets.bgmMain.volume = 0.4;
 
-// --- 2. 기기별 밸런스 제어 (PC 버전 유지, 모바일 전용 수정) ---
+// --- 2. 기기별 밸런스 제어 ---
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-// 모바일 속도: PC의 0.6배
 const speedAdjustment = isMobile ? 0.6 : 1.0; 
-
-// [수정] 모바일 점프 밸런스: 비거리(멀리 뛰기) 중심
-// 중력을 낮추면 공중에 더 오래 머물러서 멀리 가게 됩니다.
-const mobileJumpForce = isMobile ? 15.5 : 15; // 높이는 이전보다 약간 낮춤
-const mobileGravity = isMobile ? 0.55 : 0.7;   // 중력을 낮춰 체공 시간 증가
+const mobileJumpForce = isMobile ? 15.5 : 15;
+const mobileGravity = isMobile ? 0.55 : 0.7; // 중력을 낮춰 비거리(공중 체류시간) 확보
 
 let gameState = 'START';
 let score = 0;
@@ -71,20 +66,23 @@ let obstacleTimer = 0;
 let itemMeatTimerMax = 600;
 let itemMeatTimer = 0;
 
-// --- 3. 플레이어 ---
+// --- 3. 플레이어 (발밑 파티클 로직 포함) ---
 const player = {
     x: 100, y: 265, width: 100, height: 70,
     dy: 0, 
     jumpForce: mobileJumpForce,
-    gravity: mobileGravity, // 기기별 설정된 중력 적용
+    gravity: mobileGravity,
     isJumping: false, 
     frame: 0,
     draw() {
         if (!this.isJumping) {
             if (timer % 8 === 0) this.frame = this.frame === 0 ? 1 : 0;
         } else { this.frame = 0; }
+        
         const currentImg = this.frame === 0 ? assets.character1 : assets.character2;
+        
         if (currentImg.complete) {
+            // [복구] 부스터 시 발밑 노란색 파티클 이펙트
             if (isBoosterActive && boostMultiplier > 1.2 && !this.isJumping) {
                 for (let i = 0; i < 5; i++) {
                     ctx.fillStyle = '#f1c40f';
@@ -100,7 +98,7 @@ const player = {
     }
 };
 
-// --- 4. 클래스 (장애물/아이템) ---
+// --- 4. 클래스 ---
 class Obstacle {
     constructor(offsetX = 0) {
         this.width = 60; this.height = 70;
@@ -117,42 +115,69 @@ class ItemMeat {
     update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
 }
 
-// --- 5. 배경 및 루프 ---
+// --- 5. 배경 및 속도선 이펙트 ---
+function initSpeedLines() {
+    speedLines = [];
+    for (let i = 0; i < 15; i++) {
+        speedLines.push({ 
+            x: Math.random() * canvas.width, 
+            y: Math.random() * (canvas.height - 100), 
+            length: 400 + Math.random() * 600, 
+            speed: (20 + Math.random() * 30) * speedAdjustment 
+        });
+    }
+}
+
 function drawBackground() {
     const curSpeed = (GAME_SPEED + score / 500) * boostMultiplier;
     skyX -= 0.5 * speedAdjustment; 
     midX -= 1.8 * speedAdjustment; 
     groundX -= curSpeed;
+
     if (skyX <= -canvas.width) skyX = 0; 
     if (midX <= -canvas.width) midX = 0; 
     if (groundX <= -canvas.width) groundX = 0;
+
     ctx.drawImage(assets.sky, Math.floor(skyX), 0, canvas.width + 1, canvas.height);
     ctx.drawImage(assets.sky, Math.floor(skyX + canvas.width), 0, canvas.width + 1, canvas.height);
     ctx.drawImage(assets.mid, Math.floor(midX), 100, canvas.width + 1, 230);
     ctx.drawImage(assets.mid, Math.floor(midX + canvas.width), 100, canvas.width + 1, 230);
+    
+    // [복구] 부스터 시 배경 흰색 속도선(Speed Lines)
     if (isBoosterActive) {
         const alpha = (boostMultiplier - 1.0) / (MAX_BOOSTER_MULTIPLIER - 1.0) * 0.4;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; 
+        ctx.lineWidth = 2;
         speedLines.forEach(line => {
-            ctx.beginPath(); ctx.moveTo(line.x, line.y); ctx.lineTo(line.x + line.length, line.y); ctx.stroke();
+            ctx.beginPath(); 
+            ctx.moveTo(line.x, line.y); 
+            ctx.lineTo(line.x + line.length, line.y); 
+            ctx.stroke();
             line.x -= line.speed * boostMultiplier;
-            if (line.x + line.length < 0) { line.x = canvas.width + Math.random() * 200; line.y = Math.random() * (canvas.height - 100); }
+            if (line.x + line.length < 0) { 
+                line.x = canvas.width + Math.random() * 200; 
+                line.y = Math.random() * (canvas.height - 100); 
+            }
         });
     }
+
     ctx.drawImage(assets.ground, Math.floor(groundX), 310, canvas.width + 1, 90);
     ctx.drawImage(assets.ground, Math.floor(groundX + canvas.width), 310, canvas.width + 1, 90);
 }
 
+// --- 6. 게임 루프 및 시스템 ---
 function frame() {
     if (gameState !== 'PLAYING') return;
     animationFrame = requestAnimationFrame(frame);
     timer++; ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
+
     if (timer % 10 === 0) {
         const pointWeight = 1.0 + (boostMultiplier - 1.0) * (5 - 1) / (MAX_BOOSTER_MULTIPLIER - 1.0);
         score += Math.round(pointWeight);
     }
     document.getElementById('ui-score').innerText = score;
+
     if (isBoosterActive) {
         boosterTimer--;
         if (boosterTimer > BOOSTER_DURATION * 0.8) boostMultiplier += 0.04;
@@ -161,6 +186,7 @@ function frame() {
         if (boostMultiplier < 1.0) boostMultiplier = 1.0;
         if (boosterTimer <= 0) isBoosterActive = false;
     } else { boostMultiplier = 1.0; }
+
     obstacleTimer += 1 * speedAdjustment; 
     if (obstacleTimer >= obstacleTimerMax) {
         obstacles.push(new Obstacle());
@@ -168,17 +194,20 @@ function frame() {
         obstacleTimerMax = 50 + Math.random() * 80; 
         obstacleTimer = 0;
     }
+
     itemMeatTimer++;
     if (itemMeatTimer >= itemMeatTimerMax) {
         let safe = true; 
         obstacles.forEach(o => { if (Math.abs(canvas.width - o.x) < 150) safe = false; });
         if (safe) { items.push(new ItemMeat()); itemMeatTimerMax = 600 + Math.random() * 600; itemMeatTimer = 0; }
     }
+
     obstacles.forEach((o, i) => { 
         o.update(); o.draw(); 
         if (checkCollision(player, o)) endGame(); 
         if (o.x + o.width < 0) obstacles.splice(i, 1); 
     });
+
     items.forEach((m, i) => { 
         m.update(); m.draw(); 
         if (checkCollision(player, m)) { 
@@ -187,6 +216,7 @@ function frame() {
         } 
         if (m.x + m.width < 0) items.splice(i, 1); 
     });
+
     player.update(); player.draw();
 }
 
