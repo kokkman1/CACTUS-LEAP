@@ -41,7 +41,7 @@ assets.bgmMain.volume = 0.4;
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const speedAdjustment = isMobile ? 0.6 : 1.0; 
 const mobileJumpForce = isMobile ? 15.5 : 15;
-const mobileGravity = isMobile ? 0.55 : 0.7; // 중력을 낮춰 비거리(공중 체류시간) 확보
+const mobileGravity = isMobile ? 0.55 : 0.7; 
 
 let gameState = 'START';
 let score = 0;
@@ -66,7 +66,7 @@ let obstacleTimer = 0;
 let itemMeatTimerMax = 600;
 let itemMeatTimer = 0;
 
-// --- 3. 플레이어 (발밑 파티클 로직 포함) ---
+// --- 3. 플레이어 ---
 const player = {
     x: 100, y: 265, width: 100, height: 70,
     dy: 0, 
@@ -75,20 +75,25 @@ const player = {
     isJumping: false, 
     frame: 0,
     draw() {
+        // [복구 및 강화] 발밑 노란색 모래 파티클 이펙트
+        // 부스터가 활성화되어 있고 땅에 닿아 있을 때만 생성
+        if (isBoosterActive && boostMultiplier > 1.1 && !this.isJumping) {
+            ctx.fillStyle = '#f1c40f'; // 노란색 모래 색상
+            for (let i = 0; i < 6; i++) {
+                // 발뒤꿈치 쪽에서 모래가 튀는 느낌을 위해 위치 조정
+                let pX = this.x + (Math.random() * 30); 
+                let pY = this.y + this.height - 5 + (Math.random() * 12);
+                let pSize = 2 + Math.random() * 4;
+                ctx.fillRect(pX, pY, pSize, pSize);
+            }
+        }
+
         if (!this.isJumping) {
             if (timer % 8 === 0) this.frame = this.frame === 0 ? 1 : 0;
         } else { this.frame = 0; }
         
         const currentImg = this.frame === 0 ? assets.character1 : assets.character2;
-        
         if (currentImg.complete) {
-            // [복구] 부스터 시 발밑 노란색 파티클 이펙트
-            if (isBoosterActive && boostMultiplier > 1.2 && !this.isJumping) {
-                for (let i = 0; i < 5; i++) {
-                    ctx.fillStyle = '#f1c40f';
-                    ctx.fillRect(this.x + Math.random() * (this.width * 0.8), this.y + this.height - 5 + (Math.random() * 10), 4, 4);
-                }
-            }
             ctx.drawImage(currentImg, this.x, this.y, this.width, this.height);
         }
     },
@@ -115,7 +120,7 @@ class ItemMeat {
     update() { this.x -= (GAME_SPEED + score / 500) * boostMultiplier; }
 }
 
-// --- 5. 배경 및 속도선 이펙트 ---
+// --- 5. 배경 및 이펙트 ---
 function initSpeedLines() {
     speedLines = [];
     for (let i = 0; i < 15; i++) {
@@ -143,7 +148,6 @@ function drawBackground() {
     ctx.drawImage(assets.mid, Math.floor(midX), 100, canvas.width + 1, 230);
     ctx.drawImage(assets.mid, Math.floor(midX + canvas.width), 100, canvas.width + 1, 230);
     
-    // [복구] 부스터 시 배경 흰색 속도선(Speed Lines)
     if (isBoosterActive) {
         const alpha = (boostMultiplier - 1.0) / (MAX_BOOSTER_MULTIPLIER - 1.0) * 0.4;
         ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`; 
@@ -165,7 +169,7 @@ function drawBackground() {
     ctx.drawImage(assets.ground, Math.floor(groundX + canvas.width), 310, canvas.width + 1, 90);
 }
 
-// --- 6. 게임 루프 및 시스템 ---
+// --- 6. 게임 루프 ---
 function frame() {
     if (gameState !== 'PLAYING') return;
     animationFrame = requestAnimationFrame(frame);
@@ -252,6 +256,7 @@ function endGame() {
     setTimeout(() => playSfx(assets.gameover), 300);
     document.getElementById('gameover-screen').classList.remove('hidden');
     document.getElementById('final-score').innerText = `Score: ${score}`;
+    
     let ranks = JSON.parse(localStorage.getItem('hyenaRank') || '[]');
     ranks.push({ name: playerName, score: score }); 
     ranks.sort((a, b) => b.score - a.score);
@@ -272,6 +277,7 @@ function showRanking() {
     alert("🏆 TOP 5 랭킹 🏆\n\n" + msg);
 }
 
+// 이벤트 리스너
 window.addEventListener('keydown', (e) => { 
     if ((e.code === 'Space' || e.code === 'ArrowUp') && !player.isJumping && gameState === 'PLAYING') { 
         player.isJumping = true; player.dy = player.jumpForce; playSfx(assets.jump); 
